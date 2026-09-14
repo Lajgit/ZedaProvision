@@ -39,6 +39,7 @@ import com.google.android.material.textfield.TextInputLayout;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -63,8 +64,8 @@ public class MainActivity extends AppCompatActivity {
     private boolean stopRequested;
     private boolean scanInProgress;
     private boolean receiverRegistered;
-    private int acknowledgedDeviceCount;
     private int pendingPermissionAction = PERMISSION_ACTION_NONE;
+    private final Set<String> acknowledgedDeviceNumbers = new LinkedHashSet<>();
 
     private String targetSsid = "";
     private String targetPassword = "";
@@ -76,6 +77,8 @@ public class MainActivity extends AppCompatActivity {
     private TextInputEditText ssidEditText;
     private TextInputEditText passwordEditText;
     private TextView statusTextView;
+    private TextView confirmedDevicesTitleTextView;
+    private TextView confirmedDevicesListTextView;
     private Button scanButton;
     private Button startButton;
     private Button stopButton;
@@ -92,7 +95,7 @@ public class MainActivity extends AppCompatActivity {
                     wifiConfigBroadcaster.stop();
                     groupRequested = false;
                     credentialBroadcastStarted = false;
-                    acknowledgedDeviceCount = 0;
+                    clearAcknowledgedDevices();
                     stopRequested = false;
                     updateStatus(getString(R.string.status_wifi_direct_disabled), true, false);
                 } else if (!groupRequested && !scanInProgress) {
@@ -131,6 +134,8 @@ public class MainActivity extends AppCompatActivity {
         ssidEditText = findViewById(R.id.ssidEditText);
         passwordEditText = findViewById(R.id.passwordEditText);
         statusTextView = findViewById(R.id.statusTextView);
+        confirmedDevicesTitleTextView = findViewById(R.id.confirmedDevicesTitleTextView);
+        confirmedDevicesListTextView = findViewById(R.id.confirmedDevicesListTextView);
         scanButton = findViewById(R.id.scanButton);
         startButton = findViewById(R.id.startButton);
         stopButton = findViewById(R.id.stopButton);
@@ -138,6 +143,7 @@ public class MainActivity extends AppCompatActivity {
         scanButton.setOnClickListener(v -> checkPermissionAndScanWifi());
         startButton.setOnClickListener(v -> prepareProvisioning());
         stopButton.setOnClickListener(v -> stopWifiDirectGroup());
+        updateAcknowledgedDeviceList();
 
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -339,17 +345,15 @@ public class MainActivity extends AppCompatActivity {
 
         for (ScanResult scanResult : scanResults) {
             String ssid = scanResult.SSID;
-            if (TextUtils.isEmpty(ssid) || !addedSsids.add(ssid)) {
+            // 弹珠机只支持 2.4GHz；先过滤频段，再按名称去重，避免同名 5G 条目占位。
+            if (!is24GhzFrequency(scanResult.frequency)
+                    || TextUtils.isEmpty(ssid)
+                    || !addedSsids.add(ssid)) {
                 continue;
             }
 
             visibleResults.add(scanResult);
-            displayItems.add(getString(
-                    R.string.scan_wifi_item,
-                    ssid,
-                    getWifiBandLabel(scanResult.frequency),
-                    getWifiSecurityLabel(scanResult.capabilities),
-                    scanResult.level));
+            displayItems.add(ssid);
         }
 
         if (visibleResults.isEmpty()) {
@@ -416,7 +420,7 @@ public class MainActivity extends AppCompatActivity {
 
             groupRequested = true;
             credentialBroadcastStarted = false;
-            acknowledgedDeviceCount = 0;
+            clearAcknowledgedDevices();
             stopRequested = false;
             updateStatus(getString(R.string.status_starting), false, true);
             wifiP2pManager.createGroup(
@@ -502,8 +506,7 @@ public class MainActivity extends AppCompatActivity {
                         runOnUiThread(() -> updateStatus(
                                 getString(
                                         R.string.status_broadcasting,
-                                        targetSsid,
-                                        acknowledgedDeviceCount),
+                                        targetSsid),
                                 false,
                                 true));
                     }
@@ -514,15 +517,11 @@ public class MainActivity extends AppCompatActivity {
                             int acknowledgedCount
                     ) {
                         runOnUiThread(() -> {
-                            acknowledgedDeviceCount = acknowledgedCount;
-                            updateStatus(
-                                    getString(
-                                            R.string.status_device_acknowledged,
-                                            targetSsid,
-                                            acknowledgedCount,
-                                            deviceNo),
-                                    false,
-                                    true);
+                            // 回执单独追加到按钮下方，主状态继续显示配网是否仍在运行。
+                            acknowledgedDeviceNumbers.add(deviceNo);
+                            updateAcknowledgedDeviceList();
+                            Log.d(TAG, "device acknowledged: " + deviceNo
+                                    + ", count=" + acknowledgedCount);
                         });
                     }
 
@@ -574,12 +573,7 @@ public class MainActivity extends AppCompatActivity {
                 public void onSuccess() {
                     groupRequested = false;
                     stopRequested = false;
-                    updateStatus(
-                            getString(
-                                    R.string.status_stopped,
-                                    acknowledgedDeviceCount),
-                            true,
-                            false);
+                    updateStatus(getString(R.string.status_stopped), true, false);
                     if (finishAfterStop) {
                         finish();
                     }
@@ -673,42 +667,38 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
-    private String getWifiBandLabel(int frequency) {
-        if (frequency >= 2400 && frequency < 2500) {
-            return getString(R.string.wifi_band_24);
-        }
-        if (frequency >= 4900 && frequency < 5900) {
-            return getString(R.string.wifi_band_5);
-        }
-        if (frequency >= 5925 && frequency < 7125) {
-            return getString(R.string.wifi_band_6);
-        }
-        return getString(R.string.wifi_band_unknown);
+    private boolean is24GhzFrequency(int frequency) {
+        return frequency >= 2400 && frequency < 2500;
     }
 
-    private String getWifiSecurityLabel(String capabilities) {
-        String value = capabilities == null
-                ? ""
-                : capabilities.toUpperCase(Locale.ROOT);
-        if (value.contains("EAP")) {
-            return getString(R.string.wifi_security_enterprise);
+    private void clearAcknowledgedDevices() {
+        acknowledgedDeviceNumbers.clear();
+        updateAcknowledgedDeviceList();
+    }
+
+    private void updateAcknowledgedDeviceList() {
+        if (confirmedDevicesTitleTextView == null || confirmedDevicesListTextView == null) {
+            return;
         }
-        if (value.contains("SAE") && value.contains("PSK")) {
-            return getString(R.string.wifi_security_wpa2_wpa3);
+
+        confirmedDevicesTitleTextView.setText(getString(
+                R.string.confirmed_devices_title,
+                acknowledgedDeviceNumbers.size()));
+        if (acknowledgedDeviceNumbers.isEmpty()) {
+            confirmedDevicesListTextView.setText(R.string.confirmed_devices_empty);
+            return;
         }
-        if (value.contains("SAE")) {
-            return getString(R.string.wifi_security_wpa3);
+
+        StringBuilder displayText = new StringBuilder();
+        int index = 1;
+        for (String deviceNo : acknowledgedDeviceNumbers) {
+            if (displayText.length() > 0) {
+                displayText.append('\n');
+            }
+            displayText.append(getString(R.string.confirmed_device_item, index, deviceNo));
+            index++;
         }
-        if (value.contains("PSK")) {
-            return getString(R.string.wifi_security_wpa2);
-        }
-        if (value.contains("WEP")) {
-            return getString(R.string.wifi_security_wep);
-        }
-        if (value.contains("OWE")) {
-            return getString(R.string.wifi_security_owe);
-        }
-        return getString(R.string.wifi_security_open);
+        confirmedDevicesListTextView.setText(displayText.toString());
     }
 
     private boolean selectedNetworkRequiresPassword() {
