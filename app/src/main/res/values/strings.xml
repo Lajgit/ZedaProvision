@@ -1,3 +1,17 @@
 <resources>
     <string name="app_name">ZedaProvision</string>
+    <string name="hotspot_title">固定热点验证</string>
+    <string name="hotspot_info">SSID：OTA_FACTORY\n密码：12345678\n安全类型：WPA2-PSK</string>
+    <string name="status_ready">状态：等待开始</string>
+    <string name="status_requesting_permission">状态：正在请求附近 Wi-Fi 设备权限…</string>
+    <string name="status_permission_denied">状态：权限被拒绝，无法创建热点</string>
+    <string name="status_permission_error">状态：Wi-Fi 权限异常，请检查系统授权</string>
+    <string name="status_requires_android_16_1">状态：固定热点需要 Android 16 的 API 36.1 系统更新</string>
+    <string name="status_starting">状态：正在创建本地热点…</string>
+    <string name="status_running">状态：热点已启动\nSSID：%1$s\n密码：%2$s</string>
+    <string name="status_stopped">状态：热点已停止</string>
+    <string name="status_not_running">状态：热点尚未启动</string>
+    <string name="status_failed">状态：热点创建失败，错误码：%1$d</string>
+    <string name="start_provisioning">开始配网</string>
+    <string name="stop_provisioning">停止配网</string>
 </resources>
