@@ -1,6 +1,6 @@
 package com.zeda.provision;
 
-import android.util.Base64;
+import android.os.SystemClock;
 
 import org.json.JSONObject;
 
@@ -11,12 +11,12 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.InterfaceAddress;
 import java.net.NetworkInterface;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 
 final class WifiConfigBroadcaster {
 
@@ -24,7 +24,7 @@ final class WifiConfigBroadcaster {
     private static final int CONFIG_PORT = 19000;
     private static final long BROADCAST_INTERVAL_MS = 500L;
     private static final String CONFIG_SECRET = "PXD_WIFI_BATCH_CONFIG_SECRET_202606";
-    private static final String HMAC_SHA256 = "HmacSHA256";
+    private static final String ACK_STATUS_RECEIVED = "received";
 
     private volatile boolean running;
     private DatagramSocket socket;
@@ -33,6 +33,8 @@ final class WifiConfigBroadcaster {
     interface Listener {
 
         void onStarted();
+
+        void onDeviceAcknowledged(String deviceNo, int acknowledgedCount);
 
         void onFailed(Throwable error);
     }
@@ -88,22 +90,23 @@ final class WifiConfigBroadcaster {
                     .toString()
                     .replace("-", "");
             long timestamp = System.currentTimeMillis();
-            // 设备端按相同字段顺序计算 HMAC，顺序或分隔符不能改变。
-            String signRaw = configUuid
-                    + "|"
-                    + ssid
-                    + "|"
-                    + password
-                    + "|"
-                    + timestamp;
+
+            // v2 使用 AES-GCM，SSID 和密码不再以明文出现在 UDP 数据包中。
+            ProvisionCrypto.EncryptedCredentials encrypted =
+                    ProvisionCrypto.encryptCredentials(
+                            CONFIG_SECRET,
+                            configUuid,
+                            timestamp,
+                            ssid,
+                            password);
 
             JSONObject json = new JSONObject();
             json.put("type", "wifi_config");
+            json.put("protocolVersion", ProvisionCrypto.PROTOCOL_VERSION);
             json.put("configUuid", configUuid);
-            json.put("ssid", ssid);
-            json.put("password", password);
             json.put("timestamp", timestamp);
-            json.put("signature", hmacSha256Base64Url(signRaw));
+            json.put("iv", encrypted.iv);
+            json.put("ciphertext", encrypted.ciphertext);
 
             byte[] data = json.toString().getBytes(StandardCharsets.UTF_8);
             NetworkInterface networkInterface = NetworkInterface.getByName(interfaceName);
@@ -133,6 +136,7 @@ final class WifiConfigBroadcaster {
                 }
                 socket = activeSocket;
             }
+            activeSocket.setSoTimeout(100);
 
             DatagramPacket packet = new DatagramPacket(
                     data,
@@ -141,13 +145,32 @@ final class WifiConfigBroadcaster {
                     CONFIG_PORT);
 
             listener.onStarted();
-            // 保持广播，直到用户停止配网或 Activity 被销毁。
+            Set<String> acknowledgedDevices = new HashSet<>();
+            long nextBroadcastAt = 0L;
+
+            // 同一个 UDP Socket 既发送加密配置，也接收设备单播回执。
             while (running) {
-                activeSocket.send(packet);
-                Thread.sleep(BROADCAST_INTERVAL_MS);
+                long now = SystemClock.elapsedRealtime();
+                if (now >= nextBroadcastAt) {
+                    activeSocket.send(packet);
+                    nextBroadcastAt = now + BROADCAST_INTERVAL_MS;
+                }
+
+                byte[] ackBuffer = new byte[2048];
+                DatagramPacket ackPacket = new DatagramPacket(
+                        ackBuffer,
+                        ackBuffer.length);
+                try {
+                    activeSocket.receive(ackPacket);
+                    handleAcknowledgement(
+                            ackPacket,
+                            configUuid,
+                            acknowledgedDevices,
+                            listener);
+                } catch (SocketTimeoutException ignored) {
+                    // 短超时用于同时维持 500ms 广播节奏。
+                }
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
         } catch (Throwable e) {
             if (running) {
                 listener.onFailed(e);
@@ -185,14 +208,48 @@ final class WifiConfigBroadcaster {
         return null;
     }
 
-    private String hmacSha256Base64Url(String text) throws Exception {
-        Mac mac = Mac.getInstance(HMAC_SHA256);
-        mac.init(new SecretKeySpec(
-                CONFIG_SECRET.getBytes(StandardCharsets.UTF_8),
-                HMAC_SHA256));
-        byte[] signatureBytes = mac.doFinal(text.getBytes(StandardCharsets.UTF_8));
-        return Base64.encodeToString(
-                signatureBytes,
-                Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
+    private void handleAcknowledgement(
+            DatagramPacket packet,
+            String expectedConfigUuid,
+            Set<String> acknowledgedDevices,
+            Listener listener
+    ) {
+        try {
+            JSONObject json = new JSONObject(new String(
+                    packet.getData(),
+                    packet.getOffset(),
+                    packet.getLength(),
+                    StandardCharsets.UTF_8));
+
+            if (!"wifi_config_ack".equals(json.optString("type", ""))
+                    || json.optInt("protocolVersion", 0)
+                    != ProvisionCrypto.PROTOCOL_VERSION
+                    || !expectedConfigUuid.equals(json.optString("configUuid", ""))) {
+                return;
+            }
+
+            String deviceNo = json.optString("deviceNo", "").trim();
+            String status = json.optString("status", "").trim();
+            long ackTimestamp = json.optLong("timestamp", 0L);
+            String signature = json.optString("signature", "");
+            if (deviceNo.isEmpty()
+                    || !ACK_STATUS_RECEIVED.equals(status)
+                    || ackTimestamp <= 0L
+                    || !ProvisionCrypto.verifyAcknowledgement(
+                    CONFIG_SECRET,
+                    expectedConfigUuid,
+                    deviceNo,
+                    status,
+                    ackTimestamp,
+                    signature)) {
+                return;
+            }
+
+            if (acknowledgedDevices.add(deviceNo)) {
+                listener.onDeviceAcknowledged(deviceNo, acknowledgedDevices.size());
+            }
+        } catch (Throwable error) {
+            // 非本协议或校验失败的 UDP 数据不影响持续广播。
+        }
     }
 }

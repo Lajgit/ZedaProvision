@@ -63,6 +63,7 @@ public class MainActivity extends AppCompatActivity {
     private boolean stopRequested;
     private boolean scanInProgress;
     private boolean receiverRegistered;
+    private int acknowledgedDeviceCount;
     private int pendingPermissionAction = PERMISSION_ACTION_NONE;
 
     private String targetSsid = "";
@@ -91,6 +92,7 @@ public class MainActivity extends AppCompatActivity {
                     wifiConfigBroadcaster.stop();
                     groupRequested = false;
                     credentialBroadcastStarted = false;
+                    acknowledgedDeviceCount = 0;
                     stopRequested = false;
                     updateStatus(getString(R.string.status_wifi_direct_disabled), true, false);
                 } else if (!groupRequested && !scanInProgress) {
@@ -414,6 +416,7 @@ public class MainActivity extends AppCompatActivity {
 
             groupRequested = true;
             credentialBroadcastStarted = false;
+            acknowledgedDeviceCount = 0;
             stopRequested = false;
             updateStatus(getString(R.string.status_starting), false, true);
             wifiP2pManager.createGroup(
@@ -497,9 +500,30 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onStarted() {
                         runOnUiThread(() -> updateStatus(
-                                getString(R.string.status_broadcasting, targetSsid),
+                                getString(
+                                        R.string.status_broadcasting,
+                                        targetSsid,
+                                        acknowledgedDeviceCount),
                                 false,
                                 true));
+                    }
+
+                    @Override
+                    public void onDeviceAcknowledged(
+                            String deviceNo,
+                            int acknowledgedCount
+                    ) {
+                        runOnUiThread(() -> {
+                            acknowledgedDeviceCount = acknowledgedCount;
+                            updateStatus(
+                                    getString(
+                                            R.string.status_device_acknowledged,
+                                            targetSsid,
+                                            acknowledgedCount,
+                                            deviceNo),
+                                    false,
+                                    true);
+                        });
                     }
 
                     @Override
@@ -550,7 +574,12 @@ public class MainActivity extends AppCompatActivity {
                 public void onSuccess() {
                     groupRequested = false;
                     stopRequested = false;
-                    updateStatus(getString(R.string.status_stopped), true, false);
+                    updateStatus(
+                            getString(
+                                    R.string.status_stopped,
+                                    acknowledgedDeviceCount),
+                            true,
+                            false);
                     if (finishAfterStop) {
                         finish();
                     }
