@@ -1,17 +1,23 @@
 <resources>
     <string name="app_name">ZedaProvision</string>
-    <string name="hotspot_title">固定热点验证</string>
-    <string name="hotspot_info">SSID：OTA_FACTORY\n密码：12345678\n安全类型：WPA2-PSK</string>
-    <string name="status_ready">状态：等待开始</string>
-    <string name="status_requesting_permission">状态：正在请求附近 Wi-Fi 设备权限…</string>
-    <string name="status_permission_denied">状态：权限被拒绝，无法创建热点</string>
+    <string name="hotspot_title">Wi-Fi Direct 热点验证</string>
+    <string name="hotspot_info">SSID：DIRECT-ZD-OTA_FACTORY\n密码：12345678\n类型：Wi-Fi Direct 临时组</string>
+    <string name="status_ready">状态：等待创建 Wi-Fi Direct 临时组</string>
+    <string name="status_requesting_permission">状态：正在请求 Wi-Fi 所需权限…</string>
+    <string name="status_permission_denied">状态：权限被拒绝，无法创建 Wi-Fi Direct 临时组</string>
     <string name="status_permission_error">状态：Wi-Fi 权限异常，请检查系统授权</string>
-    <string name="status_requires_android_16_1">状态：固定热点需要 Android 16 的 API 36.1 系统更新</string>
-    <string name="status_starting">状态：正在创建本地热点…</string>
-    <string name="status_running">状态：热点已启动\nSSID：%1$s\n密码：%2$s</string>
-    <string name="status_stopped">状态：热点已停止</string>
-    <string name="status_not_running">状态：热点尚未启动</string>
-    <string name="status_failed">状态：热点创建失败，错误码：%1$d</string>
+    <string name="status_wifi_direct_unsupported">状态：此设备不支持 Wi-Fi Direct</string>
+    <string name="status_wifi_direct_unavailable">状态：Wi-Fi Direct 服务不可用</string>
+    <string name="status_wifi_direct_disabled">状态：请先在系统中打开 Wi-Fi</string>
+    <string name="status_channel_disconnected">状态：Wi-Fi Direct 服务连接已断开，请重新打开 App</string>
+    <string name="status_invalid_configuration">状态：Wi-Fi Direct 组名或密码配置无效</string>
+    <string name="status_starting">状态：正在创建 Wi-Fi Direct 临时组…</string>
+    <string name="status_running">状态：Wi-Fi Direct 临时组已创建\nSSID：%1$s\n密码：%2$s</string>
+    <string name="status_stopping">状态：正在停止 Wi-Fi Direct 临时组…</string>
+    <string name="status_stopped">状态：Wi-Fi Direct 临时组已停止</string>
+    <string name="status_not_running">状态：Wi-Fi Direct 临时组尚未创建</string>
+    <string name="status_failed">状态：Wi-Fi Direct 临时组创建失败，错误码：%1$d</string>
+    <string name="status_stop_failed">状态：Wi-Fi Direct 临时组停止失败，错误码：%1$d</string>
     <string name="start_provisioning">开始配网</string>
     <string name="stop_provisioning">停止配网</string>
 </resources>
