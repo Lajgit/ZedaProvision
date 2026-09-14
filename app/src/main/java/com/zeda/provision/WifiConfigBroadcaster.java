@@ -1,6 +1,5 @@
 package com.zeda.provision;
 
-import android.os.SystemClock;
 import android.util.Base64;
 
 import org.json.JSONObject;
@@ -23,7 +22,6 @@ final class WifiConfigBroadcaster {
 
     // 以下参数与 OTA_XLH3566 的批量配网接收协议保持一致。
     private static final int CONFIG_PORT = 19000;
-    private static final long BROADCAST_DURATION_MS = 300_000L;
     private static final long BROADCAST_INTERVAL_MS = 500L;
     private static final String CONFIG_SECRET = "PXD_WIFI_BATCH_CONFIG_SECRET_202606";
     private static final String HMAC_SHA256 = "HmacSHA256";
@@ -35,8 +33,6 @@ final class WifiConfigBroadcaster {
     interface Listener {
 
         void onStarted();
-
-        void onFinished();
 
         void onFailed(Throwable error);
     }
@@ -87,8 +83,6 @@ final class WifiConfigBroadcaster {
             String password,
             Listener listener
     ) {
-        boolean finishedNormally = false;
-
         try {
             String configUuid = UUID.randomUUID()
                     .toString()
@@ -147,13 +141,11 @@ final class WifiConfigBroadcaster {
                     CONFIG_PORT);
 
             listener.onStarted();
-            long endTime = SystemClock.elapsedRealtime() + BROADCAST_DURATION_MS;
-            while (running && SystemClock.elapsedRealtime() < endTime) {
+            // 保持广播，直到用户停止配网或 Activity 被销毁。
+            while (running) {
                 activeSocket.send(packet);
                 Thread.sleep(BROADCAST_INTERVAL_MS);
             }
-
-            finishedNormally = running;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } catch (Throwable e) {
@@ -168,10 +160,6 @@ final class WifiConfigBroadcaster {
                     socket = null;
                 }
                 workerThread = null;
-            }
-
-            if (finishedNormally) {
-                listener.onFinished();
             }
         }
     }

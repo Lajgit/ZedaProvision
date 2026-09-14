@@ -25,8 +25,7 @@
     <string name="status_invalid_configuration">状态：Wi-Fi Direct 组名或密码配置无效</string>
     <string name="status_starting">状态：正在创建 Wi-Fi Direct 临时组…</string>
     <string name="status_group_ready">状态：临时组已创建，正在准备下发\nSSID：%1$s\n密码：%2$s</string>
-    <string name="status_broadcasting">状态：正在下发目标 Wi-Fi：%1$s\nUDP 端口：19000\n弹珠机可在 5 分钟内接收</string>
-    <string name="status_broadcast_finished">状态：目标 Wi-Fi：%1$s 已完成 5 分钟循环下发\n请确认弹珠机连接结果后停止配网</string>
+    <string name="status_broadcasting">状态：正在持续下发目标 Wi-Fi：%1$s\nUDP 端口：19000\n完成后请点击“停止配网”</string>
     <string name="status_broadcast_failed">状态：Wi-Fi 凭据下发失败，请停止后重试</string>
     <string name="status_stopping">状态：正在停止 Wi-Fi Direct 临时组…</string>
     <string name="status_stopped">状态：Wi-Fi Direct 临时组已停止</string>

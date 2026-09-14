@@ -435,14 +435,6 @@ public class MainActivity extends AppCompatActivity {
                     }
 
                     @Override
-                    public void onFinished() {
-                        runOnUiThread(() -> updateStatus(
-                                getString(R.string.status_broadcast_finished, targetSsid),
-                                false,
-                                true));
-                    }
-
-                    @Override
                     public void onFailed(Throwable error) {
                         Log.e(TAG, "broadcast target Wi-Fi config failed", error);
                         runOnUiThread(() -> updateStatus(
