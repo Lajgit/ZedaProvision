@@ -6,6 +6,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.location.LocationManager;
+import android.net.Uri;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
 import android.net.wifi.p2p.WifiP2pConfig;
@@ -13,12 +15,15 @@ import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.TextView;
 
 import androidx.activity.EdgeToEdge;
+import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
@@ -35,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
@@ -61,6 +67,8 @@ public class MainActivity extends AppCompatActivity {
 
     private String targetSsid = "";
     private String targetPassword = "";
+    private String selectedScanSsid = "";
+    private String selectedScanCapabilities = "";
 
     private TextInputLayout ssidInputLayout;
     private TextInputLayout passwordInputLayout;
@@ -128,6 +136,18 @@ public class MainActivity extends AppCompatActivity {
         scanButton.setOnClickListener(v -> checkPermissionAndScanWifi());
         startButton.setOnClickListener(v -> prepareProvisioning());
         stopButton.setOnClickListener(v -> stopWifiDirectGroup());
+
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (groupRequested || credentialBroadcastStarted) {
+                    showStopAndExitDialog();
+                    return;
+                }
+                setEnabled(false);
+                getOnBackPressedDispatcher().onBackPressed();
+            }
+        });
 
         wifiManager = getSystemService(WifiManager.class);
         if (wifiManager == null) {
@@ -197,12 +217,14 @@ public class MainActivity extends AppCompatActivity {
                 startWifiScan();
             } else {
                 updateStatus(getString(R.string.status_scan_permission_denied), true, false);
+                showPermissionSettingsDialog(R.string.permission_scan_explanation);
             }
         } else if (action == PERMISSION_ACTION_START) {
             if (hasPermissions(getGroupPermissions())) {
                 startWifiDirectGroup();
             } else {
                 updateStatus(getString(R.string.status_permission_denied), true, false);
+                showPermissionSettingsDialog(R.string.permission_group_explanation);
             }
         }
     }
@@ -247,6 +269,25 @@ public class MainActivity extends AppCompatActivity {
         ssidInputLayout.setError(null);
         targetSsid = ssid;
         targetPassword = getInputText(passwordEditText);
+
+        if (ssid.equals(selectedScanSsid)
+                && selectedNetworkRequiresPassword()
+                && targetPassword.isEmpty()) {
+            passwordInputLayout.setError(getString(R.string.target_wifi_password_required));
+            updateStatus(getString(R.string.target_wifi_password_required), true, false);
+            return false;
+        }
+
+        if (ssid.equals(selectedScanSsid)
+                && selectedNetworkUsesPersonalPassword()
+                && !targetPassword.isEmpty()
+                && (targetPassword.length() < 8 || targetPassword.length() > 63)) {
+            passwordInputLayout.setError(getString(R.string.target_wifi_password_length_error));
+            updateStatus(getString(R.string.target_wifi_password_length_error), true, false);
+            return false;
+        }
+
+        passwordInputLayout.setError(null);
         return true;
     }
 
@@ -256,6 +297,13 @@ public class MainActivity extends AppCompatActivity {
 
     @SuppressWarnings("deprecation")
     private void startWifiScan() {
+        LocationManager locationManager = getSystemService(LocationManager.class);
+        if (locationManager != null && !locationManager.isLocationEnabled()) {
+            updateStatus(getString(R.string.status_location_disabled), true, false);
+            showEnableLocationDialog();
+            return;
+        }
+
         scanInProgress = true;
         updateStatus(getString(R.string.status_scanning), false, false);
 
@@ -283,7 +331,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         Collections.sort(scanResults, (left, right) -> Integer.compare(right.level, left.level));
-        List<String> ssids = new ArrayList<>();
+        List<ScanResult> visibleResults = new ArrayList<>();
         List<String> displayItems = new ArrayList<>();
         Set<String> addedSsids = new HashSet<>();
 
@@ -293,23 +341,37 @@ public class MainActivity extends AppCompatActivity {
                 continue;
             }
 
-            ssids.add(ssid);
-            displayItems.add(ssid + "  (" + scanResult.level + " dBm)");
+            visibleResults.add(scanResult);
+            displayItems.add(getString(
+                    R.string.scan_wifi_item,
+                    ssid,
+                    getWifiBandLabel(scanResult.frequency),
+                    getWifiSecurityLabel(scanResult.capabilities),
+                    scanResult.level));
         }
 
-        if (ssids.isEmpty()) {
+        if (visibleResults.isEmpty()) {
             updateStatus(getString(R.string.status_scan_empty), true, false);
             return;
         }
 
-        updateStatus(getString(R.string.status_scan_found, ssids.size()), true, false);
+        updateStatus(getString(R.string.status_scan_found, visibleResults.size()), true, false);
         new AlertDialog.Builder(this)
                 .setTitle(R.string.scan_wifi_title)
                 .setItems(displayItems.toArray(new String[0]), (dialog, which) -> {
-                    String selectedSsid = ssids.get(which);
+                    ScanResult selectedResult = visibleResults.get(which);
+                    String selectedSsid = selectedResult.SSID;
+                    selectedScanSsid = selectedSsid;
+                    selectedScanCapabilities = selectedResult.capabilities == null
+                            ? ""
+                            : selectedResult.capabilities;
                     ssidEditText.setText(selectedSsid);
                     ssidEditText.setSelection(selectedSsid.length());
                     ssidInputLayout.setError(null);
+                    if (!selectedNetworkRequiresPassword()) {
+                        passwordEditText.setText("");
+                        passwordInputLayout.setError(null);
+                    }
                     updateStatus(
                             getString(R.string.status_wifi_selected, selectedSsid),
                             true,
@@ -369,7 +431,13 @@ public class MainActivity extends AppCompatActivity {
                             groupRequested = false;
                             credentialBroadcastStarted = false;
                             stopRequested = false;
-                            updateStatus(getString(R.string.status_failed, reason), true, false);
+                            updateStatus(
+                                    getString(
+                                            R.string.status_failed,
+                                            getWifiP2pFailureReason(reason),
+                                            reason),
+                                    true,
+                                    false);
                         }
                     });
         } catch (SecurityException e) {
@@ -437,26 +505,39 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onFailed(Throwable error) {
                         Log.e(TAG, "broadcast target Wi-Fi config failed", error);
-                        runOnUiThread(() -> updateStatus(
-                                getString(R.string.status_broadcast_failed),
-                                false,
-                                true));
+                        runOnUiThread(() -> {
+                            credentialBroadcastStarted = false;
+                            updateStatus(
+                                    getString(R.string.status_broadcast_failed),
+                                    false,
+                                    true);
+                        });
                     }
                 });
     }
 
     private void stopWifiDirectGroup() {
+        stopWifiDirectGroup(false);
+    }
+
+    private void stopWifiDirectGroup(boolean finishAfterStop) {
         wifiConfigBroadcaster.stop();
         credentialBroadcastStarted = false;
 
         if (!groupRequested) {
             updateStatus(getString(R.string.status_not_running), true, false);
+            if (finishAfterStop) {
+                finish();
+            }
             return;
         }
 
         if (wifiP2pManager == null || wifiP2pChannel == null) {
             groupRequested = false;
             updateStatus(getString(R.string.status_wifi_direct_unavailable), false, false);
+            if (finishAfterStop) {
+                finish();
+            }
             return;
         }
 
@@ -470,17 +551,32 @@ public class MainActivity extends AppCompatActivity {
                     groupRequested = false;
                     stopRequested = false;
                     updateStatus(getString(R.string.status_stopped), true, false);
+                    if (finishAfterStop) {
+                        finish();
+                    }
                 }
 
                 @Override
                 public void onFailure(int reason) {
                     stopRequested = false;
-                    updateStatus(getString(R.string.status_stop_failed, reason), false, true);
+                    updateStatus(
+                            getString(
+                                    R.string.status_stop_failed,
+                                    getWifiP2pFailureReason(reason),
+                                    reason),
+                            false,
+                            true);
+                    if (finishAfterStop) {
+                        finish();
+                    }
                 }
             });
         } catch (SecurityException e) {
             stopRequested = false;
             updateStatus(getString(R.string.status_permission_error), false, true);
+            if (finishAfterStop) {
+                finish();
+            }
         }
     }
 
@@ -505,11 +601,114 @@ public class MainActivity extends AppCompatActivity {
         passwordInputLayout.setEnabled(canStart);
         startButton.setEnabled(canStart);
         stopButton.setEnabled(canStop);
+
+        // 配网期间保持亮屏，避免现场人员误以为锁屏后仍会继续可靠广播。
+        if (canStop) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
+    }
+
+    private void showPermissionSettingsDialog(int messageResId) {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.permission_required_title)
+                .setMessage(messageResId)
+                .setPositiveButton(R.string.open_app_settings, (dialog, which) -> {
+                    Intent intent = new Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:" + getPackageName()));
+                    startActivity(intent);
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private void showEnableLocationDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.location_required_title)
+                .setMessage(R.string.location_required_message)
+                .setPositiveButton(R.string.open_location_settings, (dialog, which) ->
+                        startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)))
+                .setNegativeButton(R.string.use_manual_input, null)
+                .show();
+    }
+
+    private void showStopAndExitDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.stop_and_exit_title)
+                .setMessage(R.string.stop_and_exit_message)
+                .setPositiveButton(R.string.stop_and_exit, (dialog, which) ->
+                        stopWifiDirectGroup(true))
+                .setNegativeButton(R.string.continue_provisioning, null)
+                .show();
+    }
+
+    private String getWifiBandLabel(int frequency) {
+        if (frequency >= 2400 && frequency < 2500) {
+            return getString(R.string.wifi_band_24);
+        }
+        if (frequency >= 4900 && frequency < 5900) {
+            return getString(R.string.wifi_band_5);
+        }
+        if (frequency >= 5925 && frequency < 7125) {
+            return getString(R.string.wifi_band_6);
+        }
+        return getString(R.string.wifi_band_unknown);
+    }
+
+    private String getWifiSecurityLabel(String capabilities) {
+        String value = capabilities == null
+                ? ""
+                : capabilities.toUpperCase(Locale.ROOT);
+        if (value.contains("EAP")) {
+            return getString(R.string.wifi_security_enterprise);
+        }
+        if (value.contains("SAE") && value.contains("PSK")) {
+            return getString(R.string.wifi_security_wpa2_wpa3);
+        }
+        if (value.contains("SAE")) {
+            return getString(R.string.wifi_security_wpa3);
+        }
+        if (value.contains("PSK")) {
+            return getString(R.string.wifi_security_wpa2);
+        }
+        if (value.contains("WEP")) {
+            return getString(R.string.wifi_security_wep);
+        }
+        if (value.contains("OWE")) {
+            return getString(R.string.wifi_security_owe);
+        }
+        return getString(R.string.wifi_security_open);
+    }
+
+    private boolean selectedNetworkRequiresPassword() {
+        String value = selectedScanCapabilities.toUpperCase(Locale.ROOT);
+        return value.contains("PSK")
+                || value.contains("SAE")
+                || value.contains("EAP")
+                || value.contains("WEP");
+    }
+
+    private boolean selectedNetworkUsesPersonalPassword() {
+        String value = selectedScanCapabilities.toUpperCase(Locale.ROOT);
+        return value.contains("PSK") || value.contains("SAE");
+    }
+
+    private String getWifiP2pFailureReason(int reason) {
+        if (reason == WifiP2pManager.P2P_UNSUPPORTED) {
+            return getString(R.string.wifi_p2p_error_unsupported);
+        }
+        if (reason == WifiP2pManager.BUSY) {
+            return getString(R.string.wifi_p2p_error_busy);
+        }
+        return getString(R.string.wifi_p2p_error_general);
     }
 
     @Override
     protected void onDestroy() {
         wifiConfigBroadcaster.stop();
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         if (receiverRegistered) {
             unregisterReceiver(wifiReceiver);
