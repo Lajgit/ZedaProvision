@@ -1,7 +1,6 @@
 <resources>
     <string name="app_name">ZedaProvision</string>
     <string name="hotspot_title">弹珠机 Wi-Fi 配网</string>
-    <string name="hotspot_info">SSID：DIRECT-ZD-OTA_FACTORY\n密码：12345678\n类型：Wi-Fi Direct 临时组</string>
     <string name="target_wifi_ssid_hint">目标 Wi-Fi 名称</string>
     <string name="target_wifi_ssid_required">请输入或扫描选择目标 Wi-Fi</string>
     <string name="target_wifi_password_hint">目标 Wi-Fi 密码</string>

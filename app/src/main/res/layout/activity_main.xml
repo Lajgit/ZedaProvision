@@ -23,15 +23,6 @@
             android:text="@string/hotspot_title"
             android:textAppearance="@style/TextAppearance.Material3.HeadlineMedium" />
 
-        <TextView
-            android:id="@+id/hotspotInfoTextView"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:gravity="center"
-            android:text="@string/hotspot_info"
-            android:textAppearance="@style/TextAppearance.Material3.BodyLarge" />
-
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/ssidInputLayout"
             android:layout_width="match_parent"
