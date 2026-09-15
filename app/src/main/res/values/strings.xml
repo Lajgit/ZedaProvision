@@ -4,7 +4,7 @@
     <string name="target_wifi_ssid_hint">目标 Wi-Fi 名称</string>
     <string name="target_wifi_ssid_required">请输入或扫描选择目标 Wi-Fi</string>
     <string name="target_wifi_password_hint">目标 Wi-Fi 密码</string>
-    <string name="target_wifi_password_helper">开放网络可以留空</string>
+    <string name="target_wifi_password_helper">仅支持 2.4GHz 开放网络或 WPA/WPA2-PSK；开放网络可以留空</string>
     <string name="target_wifi_password_required">该 Wi-Fi 需要密码，请输入后再开始配网</string>
     <string name="target_wifi_password_length_error">WPA2/WPA3 密码长度应为 8–63 个字符</string>
     <string name="scan_nearby_wifi">扫描附近 Wi-Fi</string>
@@ -17,8 +17,8 @@
     <string name="status_location_disabled">状态：系统定位服务未开启，无法扫描附近 Wi-Fi</string>
     <string name="status_permission_error">状态：Wi-Fi 权限异常，请检查系统授权</string>
     <string name="status_scanning">状态：正在扫描附近 Wi-Fi…</string>
-    <string name="status_scan_empty">状态：没有找到 2.4GHz Wi-Fi，请检查 Wi-Fi 和定位开关或手动输入</string>
-    <string name="status_scan_found">状态：找到 %1$d 个 2.4GHz Wi-Fi，请选择目标网络</string>
+    <string name="status_scan_empty">状态：没有找到兼容的 2.4GHz Wi-Fi，请检查 Wi-Fi 和定位开关或手动输入</string>
+    <string name="status_scan_found">状态：找到 %1$d 个兼容的 2.4GHz Wi-Fi，请选择目标网络</string>
     <string name="status_wifi_selected">状态：已选择目标 Wi-Fi：%1$s，请输入密码</string>
     <string name="status_wifi_direct_unsupported">状态：此设备不支持 Wi-Fi Direct</string>
     <string name="status_wifi_direct_unavailable">状态：Wi-Fi Direct 服务不可用</string>

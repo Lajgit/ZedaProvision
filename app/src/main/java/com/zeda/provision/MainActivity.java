@@ -345,8 +345,9 @@ public class MainActivity extends AppCompatActivity {
 
         for (ScanResult scanResult : scanResults) {
             String ssid = scanResult.SSID;
-            // 弹珠机只支持 2.4GHz；先过滤频段，再按名称去重，避免同名 5G 条目占位。
+            // 先过滤频段和设备不支持的安全类型，再按名称去重，避免同名不兼容条目占位。
             if (!is24GhzFrequency(scanResult.frequency)
+                    || !isSupportedWifiSecurity(scanResult.capabilities)
                     || TextUtils.isEmpty(ssid)
                     || !addedSsids.add(ssid)) {
                 continue;
@@ -669,6 +670,23 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean is24GhzFrequency(int frequency) {
         return frequency >= 2400 && frequency < 2500;
+    }
+
+    private boolean isSupportedWifiSecurity(String capabilities) {
+        String value = capabilities == null
+                ? ""
+                : capabilities.toUpperCase(Locale.ROOT);
+
+        // 设备端只按开放网络或 WPA_PSK 创建配置；带 PSK 的 WPA3 过渡网络可走 WPA2。
+        if (value.contains("WEP")
+                || value.contains("EAP")
+                || value.contains("WAPI")
+                || value.contains("OWE")
+                || value.contains("DPP")
+                || value.contains("SUITE_B_192")) {
+            return false;
+        }
+        return !value.contains("SAE") || value.contains("PSK");
     }
 
     private void clearAcknowledgedDevices() {
