@@ -346,7 +346,7 @@ public class MainActivity extends AppCompatActivity {
         for (ScanResult scanResult : scanResults) {
             String ssid = scanResult.SSID;
             // 先过滤频段和设备不支持的安全类型，再按名称去重，避免同名不兼容条目占位。
-            if (!is24GhzFrequency(scanResult.frequency)
+            if (!is24Or5GhzFrequency(scanResult.frequency)
                     || !isSupportedWifiSecurity(scanResult.capabilities)
                     || TextUtils.isEmpty(ssid)
                     || !addedSsids.add(ssid)) {
@@ -668,8 +668,9 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
-    private boolean is24GhzFrequency(int frequency) {
-        return frequency >= 2400 && frequency < 2500;
+    private boolean is24Or5GhzFrequency(int frequency) {
+        return (frequency >= 2400 && frequency < 2500)
+                || (frequency >= 4900 && frequency < 5900);
     }
 
     private boolean isSupportedWifiSecurity(String capabilities) {
