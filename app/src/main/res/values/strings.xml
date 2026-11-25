@@ -1,14 +1,19 @@
 <resources>
-    <string name="app_name">ZedaProvision</string>
+    <string name="app_name">则达配网工具</string>
     <string name="hotspot_title">弹珠机 Wi-Fi 配网</string>
     <string name="target_wifi_ssid_hint">目标 Wi-Fi 名称</string>
     <string name="target_wifi_ssid_required">请输入或扫描选择目标 Wi-Fi</string>
     <string name="target_wifi_password_hint">目标 Wi-Fi 密码</string>
-    <string name="target_wifi_password_helper">支持 2.4GHz/5GHz 开放网络或 WPA/WPA2-PSK；开放网络可以留空</string>
+    <string name="target_wifi_password_helper">可扫描 2.4GHz/5GHz 开放网络或 WPA/WPA2-PSK；开放网络可留空，设备需支持对应频段</string>
     <string name="target_wifi_password_required">该 Wi-Fi 需要密码，请输入后再开始配网</string>
     <string name="target_wifi_password_length_error">WPA2/WPA3 密码长度应为 8–63 个字符</string>
     <string name="scan_nearby_wifi">扫描附近 Wi-Fi</string>
     <string name="scan_wifi_title">选择目标 Wi-Fi</string>
+    <string name="scan_wifi_item">%1$s　信号：%2$s</string>
+    <string name="wifi_signal_excellent">优秀</string>
+    <string name="wifi_signal_good">良好</string>
+    <string name="wifi_signal_fair">一般</string>
+    <string name="wifi_signal_poor">较差</string>
     <string name="scan_wifi_cancel">取消</string>
     <string name="status_ready">状态：请填写或扫描选择目标 Wi-Fi</string>
     <string name="status_requesting_permission">状态：正在请求 Wi-Fi 所需权限…</string>

@@ -354,7 +354,7 @@ public class MainActivity extends AppCompatActivity {
             }
 
             visibleResults.add(scanResult);
-            displayItems.add(ssid);
+            displayItems.add(getString(R.string.scan_wifi_item, ssid, getSignalStrength(scanResult.level)));
         }
 
         if (visibleResults.isEmpty()) {
@@ -666,6 +666,18 @@ public class MainActivity extends AppCompatActivity {
                         stopWifiDirectGroup(true))
                 .setNegativeButton(R.string.continue_provisioning, null)
                 .show();
+    }
+
+    private String getSignalStrength(int level) {
+        // 扫描结果使用 dBm，数值越大表示信号越强。
+        if (level >= -55) {
+            return getString(R.string.wifi_signal_excellent);
+        } else if (level >= -67) {
+            return getString(R.string.wifi_signal_good);
+        } else if (level >= -75) {
+            return getString(R.string.wifi_signal_fair);
+        }
+        return getString(R.string.wifi_signal_poor);
     }
 
     private boolean is24Or5GhzFrequency(int frequency) {
