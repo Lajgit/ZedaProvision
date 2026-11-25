@@ -16,7 +16,10 @@ import android.net.wifi.p2p.WifiP2pManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.text.SpannableString;
+import android.text.Spanned;
 import android.text.TextUtils;
+import android.text.style.RelativeSizeSpan;
 import android.util.Log;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -340,7 +343,7 @@ public class MainActivity extends AppCompatActivity {
 
         Collections.sort(scanResults, (left, right) -> Integer.compare(right.level, left.level));
         List<ScanResult> visibleResults = new ArrayList<>();
-        List<String> displayItems = new ArrayList<>();
+        List<CharSequence> displayItems = new ArrayList<>();
         Set<String> addedSsids = new HashSet<>();
 
         for (ScanResult scanResult : scanResults) {
@@ -354,7 +357,16 @@ public class MainActivity extends AppCompatActivity {
             }
 
             visibleResults.add(scanResult);
-            displayItems.add(getString(R.string.scan_wifi_item, ssid, getSignalStrength(scanResult.level)));
+            SpannableString item = new SpannableString(
+                    getString(R.string.scan_wifi_item, ssid, getSignalStrength(scanResult.level)));
+            int signalStart = ssid.length();
+            while (signalStart < item.length() && Character.isWhitespace(item.charAt(signalStart))) {
+                signalStart++;
+            }
+            // 信号作为辅助信息缩小字号，间隔和 Wi-Fi 名称保持原字号。
+            item.setSpan(new RelativeSizeSpan(0.85f), signalStart, item.length(),
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            displayItems.add(item);
         }
 
         if (visibleResults.isEmpty()) {
@@ -365,7 +377,7 @@ public class MainActivity extends AppCompatActivity {
         updateStatus(getString(R.string.status_scan_found, visibleResults.size()), true, false);
         new AlertDialog.Builder(this)
                 .setTitle(R.string.scan_wifi_title)
-                .setItems(displayItems.toArray(new String[0]), (dialog, which) -> {
+                .setItems(displayItems.toArray(new CharSequence[0]), (dialog, which) -> {
                     ScanResult selectedResult = visibleResults.get(which);
                     String selectedSsid = selectedResult.SSID;
                     selectedScanSsid = selectedSsid;
