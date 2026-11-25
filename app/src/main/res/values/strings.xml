@@ -9,7 +9,7 @@
     <string name="target_wifi_password_length_error">WPA2/WPA3 密码长度应为 8–63 个字符</string>
     <string name="scan_nearby_wifi">扫描附近 Wi-Fi</string>
     <string name="scan_wifi_title">选择目标 Wi-Fi</string>
-    <string name="scan_wifi_item">"%1$s　　　信号：%2$s"</string>
+    <string name="scan_wifi_item">"%1$s　　　信号强度：%2$s"</string>
     <string name="wifi_signal_excellent">优秀</string>
     <string name="wifi_signal_good">良好</string>
     <string name="wifi_signal_fair">一般</string>
